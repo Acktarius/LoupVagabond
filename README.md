@@ -1,4 +1,4 @@
-# loupvagabond
+# LoupVagabond
 installer for Ubuntu users : LibreWolf + tor + proxychains + icon-launcher
 
 ## needed dependencies : tor + proxychains4
