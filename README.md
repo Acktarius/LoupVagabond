@@ -1,8 +1,12 @@
 # LoupVagabond
 installer for Ubuntu users : LibreWolf + tor + proxychains + icon-launcher
 
+## Install LibreWolf
+follow the instruction here: https://librewolf.net/installation/debian/ 
+
 ## needed dependencies : tor + proxychains4
-`sudo apt install -y tor`  
+`sudo apt install zenity -y`  
+`sudo apt install tor -y`  
 `sudo systemctl enable tor`  
 `sudo systemctl daemon-reload`  
 
