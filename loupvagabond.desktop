@@ -2,7 +2,7 @@
 Type=Application
 Name=LoupVagabond
 Exec=/opt/loupvagabond/proxy.sh
-Icon=/opt/loupvagabond/loupvagabond.svg
+Icon=loupvagabond.svg
 Hidden=false
 NoDisplay=false
 Terminal=false
