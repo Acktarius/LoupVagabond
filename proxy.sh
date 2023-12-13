@@ -8,9 +8,8 @@ zenity --warning \
 exit
 else
 #check tor is running
-torstatus=$(systemctl is-active --quiet tor.service)
-echo $torstatus
-if [ -z ${torstatus} ]; then
+torstatus=$(systemctl is-active tor.service)
+if [ ${torstatus} != "active" ]; then
 zenity --warning \
 --timeout=15 \
 --text="tor service is not running.\nOpen a Terminal window (Ctrl+Alt+T) and type : \n\n\t<b>sudo systemctl restart tor</b>"
