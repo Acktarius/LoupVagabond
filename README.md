@@ -24,3 +24,8 @@ follow the instruction here: https://librewolf.net/installation/debian/
 `sudo cp loupvagabond.desktop ~/.local/share/applications/loupvagabond.desktop`  
 `sudo cp loupvagabond.svg ~/.icons/loupvagabond.svg`  
 `sudo cp proxychains4.conf.temp /etc/proxychains4.conf`
+
+---
+
+## Contact
+https://discord.gg/ScY8tJUf
