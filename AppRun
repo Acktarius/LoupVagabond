@@ -1,0 +1,192 @@
+#!/bin/bash
+
+# Get the directory where AppRun is located
+APPDIR="$(dirname "$(readlink -f "$0")")"
+
+# Check for required dependencies and offer to install missing ones
+check_dependencies() {
+    local missing_deps=()
+    local install_commands=()
+    
+    if ! command -v zenity &>/dev/null; then
+        missing_deps+=("zenity")
+        install_commands+=("sudo apt-get install -y zenity || sudo dnf install -y zenity || sudo pacman -S --noconfirm zenity")
+    fi
+    
+    if ! command -v tor &>/dev/null; then
+        missing_deps+=("tor")
+        install_commands+=("sudo apt-get install -y tor || sudo dnf install -y tor || sudo pacman -S --noconfirm tor")
+    fi
+    
+    if ! command -v proxychains4 &>/dev/null; then
+        missing_deps+=("proxychains4")
+        install_commands+=("sudo apt-get install -y proxychains4 || sudo dnf install -y proxychains4 || sudo pacman -S --noconfirm proxychains4")
+    fi
+    
+    if [ ${#missing_deps[@]} -gt 0 ]; then
+        # First check if we have zenity for the dialog
+        if command -v zenity &>/dev/null; then
+            if zenity --question --title="Missing Dependencies" --text="The following required dependencies are missing:\n\n$(printf "• %s\n" "${missing_deps[@]}")\n\nWould you like to install them now?" --width=400; then
+                # Check for terminal emulators
+                TERMINAL=""
+                for term in gnome-terminal x-terminal-emulator konsole xfce4-terminal mate-terminal terminator xterm; do
+                    if command -v $term &>/dev/null; then
+                        TERMINAL=$term
+                        break
+                    fi
+                done
+                
+                if [ -z "$TERMINAL" ]; then
+                    zenity --error --title="No Terminal Found" --text="Could not find a terminal emulator to run installation commands." --width=400
+                    exit 1
+                fi
+                
+                # Create a temporary script with a reliable path
+                TEMP_SCRIPT="/tmp/loupvagabond_install_$$"
+                echo "#!/bin/bash" > "$TEMP_SCRIPT"
+                echo "echo 'Installing missing dependencies...'" >> "$TEMP_SCRIPT"
+                
+                for cmd in "${install_commands[@]}"; do
+                    echo "$cmd" >> "$TEMP_SCRIPT"
+                    echo "if [ \$? -ne 0 ]; then" >> "$TEMP_SCRIPT"
+                    echo "    echo 'Failed to install some dependencies.'" >> "$TEMP_SCRIPT"
+                    echo "    echo 'Press Enter to close this window...'" >> "$TEMP_SCRIPT"
+                    echo "    read" >> "$TEMP_SCRIPT"
+                    echo "    exit 1" >> "$TEMP_SCRIPT"
+                    echo "fi" >> "$TEMP_SCRIPT"
+                done
+                
+                echo "echo 'All dependencies installed successfully!'" >> "$TEMP_SCRIPT"
+                echo "echo 'Press Enter to close this window and continue...'" >> "$TEMP_SCRIPT"
+                echo "read" >> "$TEMP_SCRIPT"
+                echo "exit 0" >> "$TEMP_SCRIPT"
+                
+                chmod +x "$TEMP_SCRIPT"
+                
+                # Run the terminal with the script
+                case "$TERMINAL" in
+                    "gnome-terminal")
+                        $TERMINAL -- bash -c "$TEMP_SCRIPT; rm $TEMP_SCRIPT"
+                        ;;
+                    "konsole")
+                        $TERMINAL -e "bash -c \"$TEMP_SCRIPT; rm $TEMP_SCRIPT\""
+                        ;;
+                    "xfce4-terminal")
+                        $TERMINAL -e "bash -c \"$TEMP_SCRIPT; rm $TEMP_SCRIPT\""
+                        ;;
+                    "mate-terminal")
+                        $TERMINAL -e "bash -c \"$TEMP_SCRIPT; rm $TEMP_SCRIPT\""
+                        ;;
+                    "terminator")
+                        $TERMINAL -e "bash -c \"$TEMP_SCRIPT; rm $TEMP_SCRIPT\""
+                        ;;
+                    *)
+                        $TERMINAL -e "bash -c \"$TEMP_SCRIPT; rm $TEMP_SCRIPT\""
+                        ;;
+                esac
+                
+                # Check if installation was successful
+                for dep in "${missing_deps[@]}"; do
+                    if ! command -v $dep &>/dev/null; then
+                        zenity --error --title="Installation Failed" --text="Failed to install $dep. Please install it manually and try again." --width=400
+                        exit 1
+                    fi
+                done
+                
+                zenity --info --title="Dependencies Installed" --text="All required dependencies have been installed successfully." --width=400
+            else
+                zenity --error --title="Missing Dependencies" --text="Cannot continue without required dependencies." --width=400
+                exit 1
+            fi
+        else
+            # No zenity, use text-based output
+            echo "Error: The following required dependencies are missing:" >&2
+            for dep in "${missing_deps[@]}"; do
+                echo "  • $dep" >&2
+            done
+            echo "Please install them and try again." >&2
+            exit 1
+        fi
+    fi
+}
+
+# Copy proxychains4.conf if needed
+setup_proxychains_config() {
+    if [ -f "$APPDIR/etc/proxychains4.conf" ]; then
+        # Check if we have write permission to /etc
+        if [ -w "/etc" ]; then
+            # Backup existing config if it exists
+            if [ -f "/etc/proxychains4.conf" ]; then
+                cp -f "/etc/proxychains4.conf" "/etc/proxychains4.conf.backup"
+            fi
+            
+            # Copy our config
+            cp -f "$APPDIR/etc/proxychains4.conf" "/etc/proxychains4.conf"
+        else
+            # Try with pkexec
+            if command -v pkexec &>/dev/null; then
+                if zenity --question --title="Administrator Privileges Required" --text="LoupVagabond needs to copy its proxychains4 configuration to /etc/proxychains4.conf.\n\nDo you want to continue?" --width=400; then
+                    if ! pkexec cp -f "$APPDIR/etc/proxychains4.conf" "/etc/proxychains4.conf"; then
+                        zenity --error --title="Configuration Error" --text="Failed to copy proxychains4.conf. The application may not work correctly." --width=400
+                    fi
+                else
+                    zenity --warning --title="Configuration Skipped" --text="Proxychains4 configuration was not updated. The application may not work correctly." --width=400
+                fi
+            else
+                zenity --error --title="Configuration Error" --text="Cannot copy proxychains4.conf to /etc. The application may not work correctly." --width=400
+            fi
+        fi
+    fi
+}
+
+# Create desktop shortcut
+create_desktop_shortcut() {
+    if zenity --question --title="Create Desktop Shortcut" --text="Would you like to create a desktop shortcut for LoupVagabond?" --width=400; then
+        # Get username
+        USERNAME=$(whoami)
+        
+        # Create .icons directory if it doesn't exist
+        mkdir -p "/home/$USERNAME/.icons"
+        
+        # Copy icon
+        cp -f "$APPDIR/usr/share/icons/hicolor/scalable/apps/loupvagabond.svg" "/home/$USERNAME/.icons/"
+        
+        # Create desktop file
+        DESKTOP_FILE="/home/$USERNAME/.local/share/applications/loupvagabond.desktop"
+        mkdir -p "/home/$USERNAME/.local/share/applications"
+        
+        # Copy and modify desktop file
+        cp -f "$APPDIR/usr/share/applications/loupvagabond.desktop" "$DESKTOP_FILE"
+        
+        # Update Exec path in desktop file
+        sed -i "s|Exec=.*|Exec=$APPDIR/AppRun|g" "$DESKTOP_FILE"
+        
+        # Make desktop file executable
+        chmod +x "$DESKTOP_FILE"
+        
+        zenity --info --title="Shortcut Created" --text="Desktop shortcut has been created successfully." --width=400
+    fi
+}
+
+# Main function
+main() {
+    # Check dependencies
+    check_dependencies
+    
+    # Setup proxychains config
+    setup_proxychains_config
+    
+    # Offer to create desktop shortcut (only first time)
+    SHORTCUT_MARKER="/home/$(whoami)/.config/loupvagabond/shortcut_created"
+    if [ ! -f "$SHORTCUT_MARKER" ]; then
+        create_desktop_shortcut
+        mkdir -p "$(dirname "$SHORTCUT_MARKER")"
+        touch "$SHORTCUT_MARKER"
+    fi
+    
+    # Launch the application
+    "$APPDIR/usr/bin/proxy.sh"
+}
+
+# Run the main function
+main 
