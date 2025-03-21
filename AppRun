@@ -64,26 +64,11 @@ check_dependencies() {
                 chmod +x "$TEMP_SCRIPT"
                 
                 # Run the terminal with the script
-                case "$TERMINAL" in
-                    "gnome-terminal")
-                        $TERMINAL -- bash -c "$TEMP_SCRIPT; rm $TEMP_SCRIPT"
-                        ;;
-                    "konsole")
-                        $TERMINAL -e "bash -c \"$TEMP_SCRIPT; rm $TEMP_SCRIPT\""
-                        ;;
-                    "xfce4-terminal")
-                        $TERMINAL -e "bash -c \"$TEMP_SCRIPT; rm $TEMP_SCRIPT\""
-                        ;;
-                    "mate-terminal")
-                        $TERMINAL -e "bash -c \"$TEMP_SCRIPT; rm $TEMP_SCRIPT\""
-                        ;;
-                    "terminator")
-                        $TERMINAL -e "bash -c \"$TEMP_SCRIPT; rm $TEMP_SCRIPT\""
-                        ;;
-                    *)
-                        $TERMINAL -e "bash -c \"$TEMP_SCRIPT; rm $TEMP_SCRIPT\""
-                        ;;
-                esac
+                if [ "$TERMINAL" = "gnome-terminal" ]; then
+                    $TERMINAL -- bash -c "$TEMP_SCRIPT; rm $TEMP_SCRIPT"
+                else
+                    $TERMINAL -e "bash -c \"$TEMP_SCRIPT; rm $TEMP_SCRIPT\""
+                fi
                 
                 # Check if installation was successful
                 for dep in "${missing_deps[@]}"; do
