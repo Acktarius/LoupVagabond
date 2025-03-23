@@ -103,15 +103,8 @@ fi
 
 # Check if Tor service is running
 if ! systemctl is-active --quiet tor.service; then
-    show_error "Tor service is not running.\n\nTrying to start it automatically..."
-    
-    # Try to start Tor service
-    if pkexec systemctl start tor.service; then
-        show_message "Tor service successfully started!"
-    else
-        show_error "Failed to start Tor service.\n\nPlease open a Terminal window (Ctrl+Alt+T) and type:\n\n<b>sudo systemctl start tor</b>"
-        exit 1
-    fi
+    show_error "Tor service is not running.\n\nPlease open a Terminal window (Ctrl+Alt+T) and type:\n\n<b>sudo systemctl start tor</b>"
+    exit 1
 fi
 
 # Check if Tor is properly configured and accessible

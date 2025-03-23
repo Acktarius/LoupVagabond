@@ -1,0 +1,10 @@
+#!/bin/bash
+set -e
+
+# Check if loupvagabond is running and stop it if needed
+if pgrep -f loupvagabond > /dev/null; then
+    echo "Stopping any running LoupVagabond processes..."
+    pkill -f loupvagabond || true
+fi
+
+exit 0

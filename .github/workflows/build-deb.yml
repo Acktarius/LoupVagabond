@@ -1,0 +1,88 @@
+name: Build and Publish Debian Package
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build-deb:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Set up package version
+        id: pkg_version
+        run: |
+          TAG=${GITHUB_REF#refs/tags/v}
+          echo "VERSION=$TAG" >> $GITHUB_ENV
+          echo "version=$TAG" >> $GITHUB_OUTPUT
+      
+      - name: Prepare DEBIAN control files
+        run: |
+          # Create a clean DEBIAN directory
+          mkdir -p loupvagabond/DEBIAN
+          
+          # Copy all DEBIAN control files from the repo
+          cp -r deb/DEBIAN/* loupvagabond/DEBIAN/
+          
+          # Update version in control file
+          sed -i "s/Version: .*/Version: $VERSION/" loupvagabond/DEBIAN/control
+      
+      - name: Create package directory structure
+        run: |
+          # Create necessary directories
+          mkdir -p loupvagabond/usr/local/bin
+          mkdir -p loupvagabond/usr/share/applications
+          mkdir -p loupvagabond/usr/share/icons/hicolor/scalable/apps
+          mkdir -p loupvagabond/etc/loupvagabond
+          
+          # Copy main script
+          cp proxy.sh loupvagabond/usr/local/bin/loupvagabond
+          chmod +x loupvagabond/usr/local/bin/loupvagabond
+          
+          # Copy desktop file and update paths
+          cp loupvagabond.desktop loupvagabond/usr/share/applications/
+          sed -i 's|Exec=.*|Exec=/usr/local/bin/loupvagabond|' loupvagabond/usr/share/applications/loupvagabond.desktop
+          sed -i 's|Icon=.*|Icon=loupvagabond|' loupvagabond/usr/share/applications/loupvagabond.desktop
+          
+          # Copy icon
+          cp loupvagabond.svg loupvagabond/usr/share/icons/hicolor/scalable/apps/
+          
+          # Copy proxychains config
+          cp proxychains4.conf.temp loupvagabond/etc/loupvagabond/proxychains4.conf.example
+      
+      - name: Build Debian package
+        run: |
+          # Set correct permissions for DEBIAN directory files
+          chmod 755 loupvagabond/DEBIAN/postinst
+          chmod 755 loupvagabond/DEBIAN/postrm
+          chmod 755 loupvagabond/DEBIAN/preinst
+          chmod 755 loupvagabond/DEBIAN/prerm
+          
+          # Build the package
+          dpkg-deb --build loupvagabond
+          
+          # Rename the package to include version
+          mv loupvagabond.deb loupvagabond_${VERSION}_amd64.deb
+      
+      - name: Generate MD5 checksum
+        run: |
+          # Create MD5 checksum file
+          md5sum loupvagabond_${VERSION}_amd64.deb > loupvagabond_${VERSION}_amd64.deb.md5
+          cat loupvagabond_${VERSION}_amd64.deb.md5
+      
+      - name: Create Release
+        id: create_release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: Release ${{ steps.pkg_version.outputs.version }}
+          draft: false
+          prerelease: false
+          files: |
+            loupvagabond_${{ steps.pkg_version.outputs.version }}_amd64.deb
+            loupvagabond_${{ steps.pkg_version.outputs.version }}_amd64.deb.md5
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

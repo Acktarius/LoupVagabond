@@ -1,0 +1,24 @@
+#!/bin/bash
+set -e
+
+# Check for previous backup of proxychains4.conf
+if [ -f /etc/loupvagabond/proxychains4.conf.backup ]; then
+    echo "Found previous backup of proxychains4.conf. This could be from a previous installation."
+    echo "The existing backup will be preserved, and your current proxychains4.conf will be backed up again if it has changed."
+fi
+
+# Check if Tor is installed or available
+if ! [ -x "$(command -v tor)" ]; then
+    echo "Warning: Tor does not appear to be installed."
+    echo "This package requires Tor to function properly."
+    echo "It will be installed as a dependency if you're using apt."
+fi
+
+# Check if proxychains4 is installed or available
+if ! [ -x "$(command -v proxychains4)" ]; then
+    echo "Warning: proxychains4 does not appear to be installed."
+    echo "This package requires proxychains4 to function properly."
+    echo "It will be installed as a dependency if you're using apt."
+fi
+
+exit 0
