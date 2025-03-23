@@ -13,6 +13,8 @@ sudo apt install ./loupvagabond_*.deb
 # sudo apt-get install -f  # Only needed if dependencies are missing
 ```
 
+> **Note**: You might see a warning about "Download is performed unsandboxed" when installing from your Downloads folder. This is normal and not a cause for concern. It's just APT telling you that it couldn't use its sandbox security feature.
+
 ### Verifying Package Integrity
 
 Each release includes an MD5 checksum file to verify the integrity of the package:

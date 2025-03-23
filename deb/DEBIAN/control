@@ -2,9 +2,9 @@ Package: loupvagabond
 Priority: optional
 Maintainer: Acktarius <acktarius@protonmail.com>
 Homepage: https://github.com/acktarius/loupvagabond/
-Depends: tor, proxychains4, zenity, netcat-openbsd, libnotify-bin
+Depends: tor, proxychains4, zenity, netcat-openbsd, libnotify-bin, curl, iproute2
 Architecture: amd64
-Version: 1.0.0
+Version: 1.0.1
 Description: Loupvagabond is a tool to help you use Tor and proxychains4.
  Avoiding the need to type the commands every time you want to use them.
  also avoiding the need of an other web browser.

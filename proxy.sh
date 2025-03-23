@@ -51,8 +51,8 @@ get_browser_choice() {
     local browser_list=""
     local available_browsers=()
     
-    # Check for common browsers
-    browsers=("librewolf" "firedragon" "firefox" "firefox-esr" "chromium" "brave-browser" "tor-browser")
+    # Check for common browsers - EXCLUDING Firefox and Tor Browser
+    browsers=("librewolf" "firedragon" "chromium" "brave-browser")
     
     for browser in "${browsers[@]}"; do
         if command -v "$browser" &> /dev/null; then
@@ -68,7 +68,7 @@ get_browser_choice() {
     
     # If no browsers found
     if [ ${#available_browsers[@]} -eq 0 ]; then
-        show_error "No supported browsers found. Please install at least one of: librewolf, firefox, tor-browser"
+        show_error "No supported browsers found. Please install at least one of: librewolf, chromium, brave-browser"
         exit 1
     fi
     
@@ -101,32 +101,139 @@ if pgrep -x "$BROWSER" > /dev/null; then
     exit 1
 fi
 
-# Check if Tor service is running
-if ! systemctl is-active --quiet tor.service; then
-    show_error "Tor service is not running.\n\nPlease open a Terminal window (Ctrl+Alt+T) and type:\n\n<b>sudo systemctl start tor</b>"
+# Function to check if Tor is actually running and providing a SOCKS proxy
+check_tor_status() {
+    # First check if the systemd service is active
+    if ! systemctl is-active --quiet tor.service; then
+        return 1
+    fi
+    
+    # Verify the SOCKS port is actually listening
+    if command -v nc &> /dev/null; then
+        if ! nc -z -w2 127.0.0.1 9050; then
+            return 1
+        fi
+    elif command -v ss &> /dev/null; then
+        if ! ss -nlt | grep -q "127.0.0.1:9050"; then
+            return 1
+        fi
+
+    fi
+    
+    # All checks passed
+    return 0
+}
+
+# Function to verify that proxychains is working correctly with Tor
+verify_proxychains() {
+    # Check if curl is installed
+    if ! command -v curl &>/dev/null; then
+        show_warning "curl not installed. Skipping proxychains verification."
+        return 0
+    fi
+    
+    # Try to get IP through proxychains
+    local regular_ip=$(curl -s --max-time 10 https://ip.me)
+    if [ -z "$regular_ip" ]; then
+        show_warning "Could not determine your regular IP. Skipping verification."
+        return 0
+    fi
+    
+    # Get IP through proxychains
+    echo "Testing Tor connection..." >&2
+    local proxy_ip=$(proxychains4 curl -s --max-time 15 https://ip.me 2>/dev/null)
+    
+    # Check if we got a response
+    if [ -z "$proxy_ip" ]; then
+        show_error "proxychains doesn't seem to be working correctly.\nCould not get an IP address through Tor."
+        return 1
+    fi
+    
+    # Check if the IPs are different (indicating proxychains is working)
+    if [ "$regular_ip" == "$proxy_ip" ]; then
+        show_error "proxychains is not working correctly!\nYour real IP ($regular_ip) is leaking through Tor."
+        return 1
+    fi
+    
+    # Success - show notification with the Tor IP
+    show_notification "Tor Connection" "Connected via Tor IP: $proxy_ip"
+    return 0
+}
+
+# Set browser-specific proxy settings
+configure_browser_for_privacy() {
+    case "$BROWSER" in
+        librewolf|firedragon)
+            # Use a clean profile with minimal customization
+            PROFILE_NAME="torproxy_$(date +%s)"
+            $BROWSER --CreateProfile "$PROFILE_NAME" >/dev/null 2>&1
+            sleep 1
+            
+            # Update the browser command to use this profile
+            BROWSER="$BROWSER -P $PROFILE_NAME -no-remote"
+            BROWSER_TYPE="mozilla"
+            ;;
+            
+        brave-browser)
+            # For Brave Browser, direct SOCKS proxy approach instead of proxychains
+            DATA_DIR=$(mktemp -d /tmp/brave_proxy_XXXXXX)
+            chmod 700 "$DATA_DIR"
+            
+            # Add direct SOCKS proxy settings
+            BROWSER="brave-browser --incognito --proxy-server=socks5://127.0.0.1:9050 --user-data-dir=$DATA_DIR"
+            BROWSER_TYPE="brave"
+            ;;
+            
+        chromium)
+            # For Chromium, use direct proxy settings
+            DATA_DIR=$(mktemp -d /tmp/chrome_proxy_XXXXXX)
+            chmod 700 "$DATA_DIR"
+            
+            BROWSER="$BROWSER --incognito --proxy-server=socks5://127.0.0.1:9050 --user-data-dir=$DATA_DIR"
+            BROWSER_TYPE="chromium"
+            ;;
+            
+        *)
+            # For other browsers, we'll rely on proxychains alone
+            show_warning "Unknown browser: $BROWSER\nWill rely solely on proxychains for anonymization."
+            BROWSER_TYPE="unknown"
+            ;;
+    esac
+}
+
+# Check if Tor service is running and providing SOCKS proxy
+if ! check_tor_status; then
+    show_error "Tor service is not running.\n\nPlease open a Terminal window (Ctrl+Alt+T) and type:\n\nsudo systemctl start tor"
     exit 1
 fi
 
-# Check if Tor is properly configured and accessible
-if ! command -v nc &> /dev/null; then
-    # If netcat is not available, skip this check
-    show_warning "Network connectivity tool (nc) not found. Skipping Tor connectivity check."
-else
-    if ! nc -z -w5 127.0.0.1 9050; then
-        show_error "Cannot connect to Tor at 127.0.0.1:9050\nPlease check your Tor configuration."
-        exit 1
-    fi
+# Verify proxychains is working correctly
+if ! verify_proxychains; then
+    show_error "ProxyChains is not working correctly. Please check your configuration."
+    exit 1
 fi
 
-# Launch browser with proxy
-# Launch browser in background and fully detach it
-(
-    $PROXY_COMMAND $BROWSER "$START_URL" >/dev/null 2>&1
-) </dev/null >/dev/null 2>&1 &
-disown
+# Configure the browser with proxy settings
+configure_browser_for_privacy
 
-# Display notification
-show_notification "Anonymous Browsing" "Started $BROWSER through Tor proxy"
+# Launch browser with proxy
+show_notification "Anonymous Browsing" "Starting $BROWSER through Tor proxy"
+
+# Launch browser in background and fully detach it based on browser type
+if [ "$BROWSER_TYPE" = "brave" ]; then
+    # For Brave, launch directly with its own proxy settings, no proxychains
+    (
+        echo "Launching Brave directly with proxy settings: $BROWSER"
+        $BROWSER "$START_URL" >/dev/null 2>&1
+    ) </dev/null >/dev/null 2>&1 &
+    disown
+else
+    # Default launch for other browsers using proxychains
+    (
+        $PROXY_COMMAND $BROWSER "$START_URL" >/dev/null 2>&1
+    ) </dev/null >/dev/null 2>&1 &
+    disown
+fi
 
 # Ensure the script exits immediately
 exit 0
