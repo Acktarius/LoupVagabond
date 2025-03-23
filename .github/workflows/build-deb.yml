@@ -5,6 +5,10 @@ on:
     tags:
       - 'v*'
 
+# Explicitly declare needed permissions
+permissions:
+  contents: write  # This is required for creating releases
+
 jobs:
   build-deb:
     runs-on: ubuntu-latest
