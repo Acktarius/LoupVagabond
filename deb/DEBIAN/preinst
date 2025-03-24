@@ -1,39 +1,24 @@
 #!/bin/bash
-# This script will run before unpacking the new package
-set +e  # Continue even if errors occur
+set -e
 
-echo "LoupVagabond pre-installation cleaning..."
-
-# Kill any running processes
-pkill -f loupvagabond 2>/dev/null || true
-sleep 1
-pkill -9 -f loupvagabond 2>/dev/null || true
-
-# Remove all files from previous installations
-echo "Cleaning up any previous installation files..."
-rm -f /usr/local/bin/loupvagabond 2>/dev/null || true
-rm -f /usr/bin/loupvagabond 2>/dev/null || true
-rm -f /usr/share/applications/loupvagabond.desktop 2>/dev/null || true
-rm -f /usr/share/icons/hicolor/*/apps/loupvagabond.* 2>/dev/null || true
-rm -f /usr/share/pixmaps/loupvagabond.* 2>/dev/null || true
-
-# Clean up temp files
-rm -rf /tmp/brave_proxy_* /tmp/chrome_proxy_* 2>/dev/null || true
-
-# Check if we need to manually fix dpkg database
-if grep -q "loupvagabond.*half-configured\|loupvagabond.*half-installed\|loupvagabond.*unpacked" /var/lib/dpkg/status 2>/dev/null; then
-    echo "WARNING: Detected broken package state in dpkg database, attempting to fix..."
-    # Try to edit the dpkg status file to remove the problematic entry
-    # Create backup first
-    cp /var/lib/dpkg/status /var/lib/dpkg/status.bak.$(date +%s) 2>/dev/null || true
-    
-    # Use sed with buffer to modify the file
-    sed -i '/^Package: loupvagabond$/,/^$/d' /var/lib/dpkg/status 2>/dev/null || true
-    
-    echo "NOTE: If installation still fails, you may need to manually edit /var/lib/dpkg/status"
-    echo "      and remove the entire section for the loupvagabond package."
+# Check for previous backup of proxychains4.conf
+if [ -f /etc/loupvagabond/proxychains4.conf.backup ]; then
+    echo "Found previous backup of proxychains4.conf. This could be from a previous installation."
+    echo "The existing backup will be preserved, and your current proxychains4.conf will be backed up again if it has changed."
 fi
 
-# Exit cleanly - we want this script to always succeed
-echo "Pre-installation cleanup complete."
+# Check if Tor is installed or available
+if ! [ -x "$(command -v tor)" ]; then
+    echo "Warning: Tor does not appear to be installed."
+    echo "This package requires Tor to function properly."
+    echo "It will be installed as a dependency if you're using apt."
+fi
+
+# Check if proxychains4 is installed or available
+if ! [ -x "$(command -v proxychains4)" ]; then
+    echo "Warning: proxychains4 does not appear to be installed."
+    echo "This package requires proxychains4 to function properly."
+    echo "It will be installed as a dependency if you're using apt."
+fi
+
 exit 0

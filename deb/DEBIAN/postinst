@@ -1,6 +1,4 @@
 #!/bin/bash
-# Don't exit on error, but report them
-set +e
 
 echo "LoupVagabond post-installation script running..."
 
