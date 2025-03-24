@@ -44,7 +44,7 @@ jobs:
           mkdir -p loupvagabond/etc/loupvagabond
           
           # Copy main script
-          cp proxy.sh loupvagabond/usr/local/bin/loupvagabond
+          cp louvagabond.sh loupvagabond/usr/local/bin/loupvagabond
           chmod +x loupvagabond/usr/local/bin/loupvagabond
           
           # Copy desktop file and update paths

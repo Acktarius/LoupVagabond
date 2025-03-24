@@ -1,10 +1,11 @@
 [Desktop Entry]
 Type=Application
 Name=LoupVagabond
-Exec=/opt/loupvagabond/proxy.sh
-Icon=loupvagabond.svg
+Exec=/usr/local/bin/loupvagabond
+Icon=loupvagabond
 Hidden=false
 NoDisplay=false
 Terminal=false
 Comment=open Librewolf via proxychains4 and tor 
 X-GNOME-Autostart-enabled=true
+Categories=Network;Security;Utility;
