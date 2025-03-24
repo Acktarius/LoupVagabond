@@ -194,9 +194,8 @@ configure_browser_for_privacy() {
             ;;
             
         *)
-            # For other browsers, we'll rely on proxychains alone
-            show_warning "Unknown browser: $BROWSER\nWill rely solely on proxychains for anonymization."
-            BROWSER_TYPE="unknown"
+            # Exit silently for any unsupported browser - we already checked for supported browsers earlier
+            exit 1
             ;;
     esac
 }
