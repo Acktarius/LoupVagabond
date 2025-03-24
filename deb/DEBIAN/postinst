@@ -1,27 +1,45 @@
 #!/bin/bash
-set -e
+# Don't exit on error, but report them
+set +e
 
-# Make the main script executable
-chmod 755 /usr/local/bin/loupvagabond
+echo "LoupVagabond post-installation script running..."
+
+# Make sure we have the correct installation location
+if [ ! -f /usr/local/bin/loupvagabond ]; then
+    echo "Warning: Main script not found at expected location (/usr/local/bin/loupvagabond)!"
+    # Try to find it and correct the location
+    if [ -f /usr/bin/loupvagabond ]; then
+        echo "Found script in /usr/bin, moving to correct location..."
+        cp /usr/bin/loupvagabond /usr/local/bin/loupvagabond
+        rm -f /usr/bin/loupvagabond
+    fi
+fi
+
+# Make the script executable
+echo "Making the script executable..."
+chmod 755 /usr/local/bin/loupvagabond || echo "Warning: Could not make script executable"
 
 # Handle proxychains4 configuration
-if [ -f /etc/proxychains4.conf ]; then
+if [ -f /etc/proxychains4.conf ] && [ ! -f /etc/loupvagabond/proxychains4.conf.backup ]; then
     echo "Backing up existing proxychains4.conf..."
     mkdir -p /etc/loupvagabond
-    cp /etc/proxychains4.conf /etc/loupvagabond/proxychains4.conf.backup
+    cp /etc/proxychains4.conf /etc/loupvagabond/proxychains4.conf.backup || echo "Warning: Could not backup proxychains config"
 fi
 
 # Install our proxychains4 configuration
-echo "Installing LoupVagabond's proxychains4 configuration..."
-cp /etc/loupvagabond/proxychains4.conf.example /etc/proxychains4.conf
+if [ -f /etc/loupvagabond/proxychains4.conf.example ]; then
+    echo "Installing LoupVagabond's proxychains4 configuration..."
+    cp /etc/loupvagabond/proxychains4.conf.example /etc/proxychains4.conf || echo "Warning: Could not install proxychains config"
+fi
 
 # Enable Tor service but don't start it (respect user's decision)
 echo "Enabling Tor service on system boot..."
-systemctl enable tor.service
+systemctl enable tor.service || echo "Warning: Could not enable Tor service"
 
 # Check if service is already running before trying to start it
 if ! systemctl is-active --quiet tor.service; then
-    systemctl start tor.service
+    echo "Starting Tor service..."
+    systemctl start tor.service || echo "Warning: Could not start Tor service"
 else
     echo "Tor service is already running."
 fi
@@ -30,6 +48,9 @@ fi
 if [ -x "$(command -v update-desktop-database)" ]; then
     update-desktop-database -q
 fi
+
+# Clean up any temporary files from previous runs
+rm -rf /tmp/brave_proxy_* /tmp/chrome_proxy_* 2>/dev/null || true
 
 # Notify of successful installation
 echo "LoupVagabond has been successfully installed!"

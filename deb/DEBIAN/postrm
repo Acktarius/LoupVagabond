@@ -1,16 +1,35 @@
 #!/bin/bash
-set -e
+# Don't exit on error, but keep track of errors
+set +e
+
+echo "LoupVagabond post-removal script running..."
 
 # Restore original proxychains4.conf if backup exists
 if [ -f /etc/loupvagabond/proxychains4.conf.backup ]; then
     echo "Restoring original proxychains4.conf from backup..."
-    cp /etc/loupvagabond/proxychains4.conf.backup /etc/proxychains4.conf
+    cp /etc/loupvagabond/proxychains4.conf.backup /etc/proxychains4.conf || echo "Failed to restore proxychains4.conf"
     
     # Remove backup if requested to purge
     if [ "$1" = "purge" ]; then
         rm -f /etc/loupvagabond/proxychains4.conf.backup
     fi
 fi
+
+# Thorough cleanup of all package files regardless of removal or purge
+# This ensures no files are left behind that could cause issues with reinstalls
+echo "Ensuring all application files are removed..."
+
+# Remove program files
+rm -f /usr/local/bin/loupvagabond 2>/dev/null || true
+# Also check in usr/bin in case files were installed there by mistake
+rm -f /usr/bin/loupvagabond 2>/dev/null || true
+
+# Remove desktop files
+rm -f /usr/share/applications/loupvagabond.desktop 2>/dev/null || true
+
+# Remove icon files
+rm -f /usr/share/icons/hicolor/*/apps/loupvagabond.* 2>/dev/null || true
+rm -f /usr/share/pixmaps/loupvagabond.* 2>/dev/null || true
 
 # Note about Tor service
 if systemctl is-enabled --quiet tor.service 2>/dev/null; then
@@ -29,6 +48,10 @@ if [ "$1" = "purge" ]; then
     # Remove any configuration files or leftover data
     echo "Purging all LoupVagabond data..."
     rm -rf /etc/loupvagabond
+else
+    # Even on regular remove, clean up temp files that might cause issues
+    rm -rf /tmp/brave_proxy_* /tmp/chrome_proxy_* 2>/dev/null || true
 fi
 
+echo "Post-removal completed successfully."
 exit 0

@@ -1,10 +1,26 @@
 #!/bin/bash
+# Make sure this script doesn't fail even if there are errors
 set -e
 
-# Check if loupvagabond is running and stop it if needed
-if pgrep -f loupvagabond > /dev/null; then
-    echo "Stopping any running LoupVagabond processes..."
-    pkill -f loupvagabond || true
+echo "LoupVagabond pre-removal script running..."
+
+# More thorough process cleanup - check for all related processes
+for proc in loupvagabond brave-browser chromium librewolf firedragon; do
+    if pgrep -f "$proc" > /dev/null; then
+        echo "Stopping processes related to $proc..."
+        pkill -f "$proc" || true
+        # Give processes time to exit gracefully
+        sleep 1
+        # Force kill any remaining processes
+        pkill -9 -f "$proc" 2>/dev/null || true
+    fi
+done
+
+# Ensure any symlinks are removed in case they're causing issues
+if [ -L /usr/bin/loupvagabond ]; then
+    echo "Removing symlink..."
+    rm -f /usr/bin/loupvagabond || true
 fi
 
+echo "Pre-removal completed successfully."
 exit 0
