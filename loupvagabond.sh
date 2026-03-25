@@ -4,6 +4,8 @@
 DEFAULT_BROWSER="librewolf"
 START_URL="https://www.qwant.com/"
 PROXY_COMMAND="proxychains4"
+TOR_SOCKS_PORT="9050"
+TEMP_DATA_DIR=""
 
 # Check for required dependencies
 if ! command -v zenity &>/dev/null; then
@@ -44,6 +46,14 @@ show_notification() {
     # Use zenity notification (we already checked it exists at script start)
     zenity --notification --text="$title: $message" 2>/dev/null
 }
+
+# Clean temporary browser data directories on script exit.
+cleanup() {
+    if [ -n "$TEMP_DATA_DIR" ] && [ -d "$TEMP_DATA_DIR" ]; then
+        rm -rf "$TEMP_DATA_DIR" 2>/dev/null || true
+    fi
+}
+trap cleanup EXIT
 
 # Function to check for installed browsers
 get_browser_choice() {
@@ -103,25 +113,38 @@ fi
 
 # Function to check if Tor is actually running and providing a SOCKS proxy
 check_tor_status() {
-    # First check if the systemd service is active
-    if ! systemctl is-active --quiet tor.service; then
+    # Accept common Tor unit names across distros.
+    if ! systemctl is-active --quiet tor.service && ! systemctl is-active --quiet tor@default.service; then
         return 1
     fi
-    
-    # Verify the SOCKS port is actually listening
-    if command -v nc &> /dev/null; then
-        if ! nc -z -w2 127.0.0.1 9050; then
-            return 1
-        fi
-    elif command -v ss &> /dev/null; then
-        if ! ss -nlt | grep -q "127.0.0.1:9050"; then
-            return 1
+
+    # Verify the SOCKS port is actually listening (prefer 9050, fallback 9150).
+    check_socks_port() {
+        local port="$1"
+        if command -v nc &> /dev/null; then
+            nc -z -w2 127.0.0.1 "$port"
+            return $?
+        elif command -v ss &> /dev/null; then
+            ss -nlt | grep -q "127.0.0.1:$port"
+            return $?
         fi
 
+        # If neither tool is available, skip strict port probing.
+        return 0
+    }
+
+    if check_socks_port 9050; then
+        TOR_SOCKS_PORT="9050"
+        return 0
     fi
-    
-    # All checks passed
-    return 0
+
+    if check_socks_port 9150; then
+        TOR_SOCKS_PORT="9150"
+        return 0
+    fi
+
+    # No known SOCKS port found.
+    return 1
 }
 
 # Function to verify that proxychains is working correctly with Tor
@@ -141,7 +164,7 @@ verify_proxychains() {
     
     # Get IP through proxychains
     echo "Testing Tor connection..." >&2
-    local proxy_ip=$(proxychains4 curl -s --max-time 15 https://ip.me 2>/dev/null)
+    local proxy_ip=$($PROXY_COMMAND curl -s --max-time 15 https://ip.me 2>/dev/null)
     
     # Check if we got a response
     if [ -z "$proxy_ip" ]; then
@@ -176,20 +199,20 @@ configure_browser_for_privacy() {
             
         brave-browser)
             # For Brave Browser, direct SOCKS proxy approach instead of proxychains
-            DATA_DIR=$(mktemp -d /tmp/brave_proxy_XXXXXX)
-            chmod 700 "$DATA_DIR"
+            TEMP_DATA_DIR=$(mktemp -d /tmp/brave_proxy_XXXXXX)
+            chmod 700 "$TEMP_DATA_DIR"
             
             # Add direct SOCKS proxy settings
-            BROWSER="brave-browser --incognito --proxy-server=socks5://127.0.0.1:9050 --user-data-dir=$DATA_DIR"
+            BROWSER="brave-browser --incognito --proxy-server=socks5://127.0.0.1:$TOR_SOCKS_PORT --user-data-dir=$TEMP_DATA_DIR"
             BROWSER_TYPE="brave"
             ;;
             
         chromium)
             # For Chromium, use direct proxy settings
-            DATA_DIR=$(mktemp -d /tmp/chrome_proxy_XXXXXX)
-            chmod 700 "$DATA_DIR"
+            TEMP_DATA_DIR=$(mktemp -d /tmp/chrome_proxy_XXXXXX)
+            chmod 700 "$TEMP_DATA_DIR"
             
-            BROWSER="$BROWSER --incognito --proxy-server=socks5://127.0.0.1:9050 --user-data-dir=$DATA_DIR"
+            BROWSER="$BROWSER --incognito --proxy-server=socks5://127.0.0.1:$TOR_SOCKS_PORT --user-data-dir=$TEMP_DATA_DIR"
             BROWSER_TYPE="chromium"
             ;;
             
@@ -202,36 +225,47 @@ configure_browser_for_privacy() {
 
 # Check if Tor service is running and providing SOCKS proxy
 if ! check_tor_status; then
-    show_error "Tor service is not running.\n\nPlease open a Terminal window (Ctrl+Alt+T) and type:\n\nsudo systemctl start tor"
-    exit 1
-fi
-
-# Verify proxychains is working correctly
-if ! verify_proxychains; then
-    show_error "ProxyChains is not working correctly. Please check your configuration."
+    show_error "Tor service is not running.\n\nPlease open a Terminal window (Ctrl+Alt+T) and type one of:\n\nsudo systemctl start tor\nsudo systemctl start tor@default"
     exit 1
 fi
 
 # Configure the browser with proxy settings
 configure_browser_for_privacy
 
+# For Mozilla browsers, we rely on proxychains.
+if [ "$BROWSER_TYPE" = "mozilla" ]; then
+    # Check if proxy command is installed
+    proxy_bin="${PROXY_COMMAND%% *}"
+    if ! command -v "$proxy_bin" >/dev/null 2>&1; then
+        show_error "$proxy_bin is not installed. Please install it first."
+        exit 1
+    fi
+
+    # Verify proxychains is working correctly
+    if ! verify_proxychains; then
+        show_error "ProxyChains is not working correctly. Please check your configuration."
+        exit 1
+    fi
+fi
+
 # Launch browser with proxy
 show_notification "Anonymous Browsing" "Starting $BROWSER through Tor proxy"
 
 # Launch browser in background and fully detach it based on browser type
-if [ "$BROWSER_TYPE" = "brave" ]; then
-    # For Brave, launch directly with its own proxy settings, no proxychains
-    (
-        echo "Launching Brave directly with proxy settings: $BROWSER"
-        $BROWSER "$START_URL" >/dev/null 2>&1
-    ) </dev/null >/dev/null 2>&1 &
-    disown
-else
-    # Default launch for other browsers using proxychains
+if [ "$BROWSER_TYPE" = "mozilla" ]; then
+    # Mozilla browsers use proxychains.
     (
         $PROXY_COMMAND $BROWSER "$START_URL" >/dev/null 2>&1
     ) </dev/null >/dev/null 2>&1 &
     disown
+else
+    # Chromium/Brave launch directly with --proxy-server.
+    # Keep this script alive until browser exits so cleanup runs afterward.
+    (
+        $BROWSER "$START_URL" >/dev/null 2>&1
+    ) </dev/null >/dev/null 2>&1 &
+    BROWSER_PID=$!
+    wait "$BROWSER_PID"
 fi
 
 # Ensure the script exits immediately

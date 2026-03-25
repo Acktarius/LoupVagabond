@@ -61,23 +61,6 @@ follow the instruction here: https://librewolf.net/installation/debian/
 
 ---
 
-## For Developers: Releasing a New Version
-
-The project uses GitHub Actions to automatically build a Debian package when a new tag is pushed. To release a new version:
-
-1. Make your changes to the code
-2. Push your changes to the main branch
-3. Create and push a new tag with a version number:
-
-```bash
-git tag v1.0.1
-git push origin v1.0.1
-```
-
-The GitHub workflow will automatically:
-- Build a Debian package with the correct version
-- Create a new release with the package attached
-- Publish it to the releases page
 
 ## Contact
 https://discord.gg/ScY8tJUf
