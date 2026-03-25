@@ -1,11 +1,36 @@
 #!/bin/bash
 
 # Variables for customization
+APP_NAME="LoupVagabond"
+APP_VERSION="1.0.7"
 DEFAULT_BROWSER="librewolf"
 START_URL="https://www.qwant.com/"
 PROXY_COMMAND="proxychains4"
 TOR_SOCKS_PORT="9050"
 TEMP_DATA_DIR=""
+
+# Prefer installed package version; fallback to script version.
+get_app_version() {
+    local pkg_version
+    pkg_version=$(dpkg-query -W -f='${Version}' loupvagabond 2>/dev/null || true)
+    if [ -n "$pkg_version" ]; then
+        echo "$pkg_version"
+    else
+        echo "$APP_VERSION"
+    fi
+}
+
+# CLI flags
+case "${1:-}" in
+    --version|-v)
+        echo "$APP_NAME $(get_app_version)"
+        exit 0
+        ;;
+    --help|-h)
+        echo "Usage: loupvagabond [--version|-v] [--help|-h]"
+        exit 0
+        ;;
+esac
 
 # Check for required dependencies
 if ! command -v zenity &>/dev/null; then
