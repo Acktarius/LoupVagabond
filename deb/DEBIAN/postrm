@@ -43,6 +43,11 @@ if [ -x "$(command -v update-desktop-database)" ]; then
     update-desktop-database -q
 fi
 
+# Refresh icon cache after icon removal.
+if [ -x "$(command -v gtk-update-icon-cache)" ]; then
+    gtk-update-icon-cache -f -t /usr/share/icons/hicolor || echo "Warning: Could not refresh icon cache"
+fi
+
 # Remove config files if purge was requested
 if [ "$1" = "purge" ]; then
     # Remove any configuration files or leftover data

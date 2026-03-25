@@ -41,6 +41,7 @@ jobs:
           mkdir -p loupvagabond/usr/local/bin
           mkdir -p loupvagabond/usr/share/applications
           mkdir -p loupvagabond/usr/share/icons/hicolor/scalable/apps
+          mkdir -p loupvagabond/usr/share/icons/hicolor/128x128/apps
           mkdir -p loupvagabond/etc/loupvagabond
           
           # Copy main script
@@ -52,8 +53,9 @@ jobs:
           sed -i 's|Exec=.*|Exec=/usr/local/bin/loupvagabond|' loupvagabond/usr/share/applications/loupvagabond.desktop
           sed -i 's|Icon=.*|Icon=loupvagabond|' loupvagabond/usr/share/applications/loupvagabond.desktop
           
-          # Copy icon
+          # Copy icons (PNG fallback improves desktop compatibility)
           cp loupvagabond.svg loupvagabond/usr/share/icons/hicolor/scalable/apps/
+          cp loupvagabond.png loupvagabond/usr/share/icons/hicolor/128x128/apps/
           
           # Copy proxychains config
           cp proxychains4.conf.temp loupvagabond/etc/loupvagabond/proxychains4.conf.example
