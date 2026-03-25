@@ -66,8 +66,8 @@ jobs:
           chmod 755 loupvagabond/DEBIAN/preinst
           chmod 755 loupvagabond/DEBIAN/prerm
           
-          # Build the package
-          dpkg-deb --build loupvagabond
+          # Build the package with root ownership metadata
+          dpkg-deb --build --root-owner-group loupvagabond
           
           # Rename the package to include version
           mv loupvagabond.deb loupvagabond_${VERSION}_amd64.deb

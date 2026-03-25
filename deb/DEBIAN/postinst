@@ -47,6 +47,11 @@ if [ -x "$(command -v update-desktop-database)" ]; then
     update-desktop-database -q
 fi
 
+# Refresh icon cache so the desktop entry icon appears immediately.
+if [ -x "$(command -v gtk-update-icon-cache)" ]; then
+    gtk-update-icon-cache -f -t /usr/share/icons/hicolor || echo "Warning: Could not refresh icon cache"
+fi
+
 # Clean up any temporary files from previous runs
 rm -rf /tmp/brave_proxy_* /tmp/chrome_proxy_* 2>/dev/null || true
 
