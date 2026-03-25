@@ -4,17 +4,14 @@ set -e
 
 echo "LoupVagabond pre-removal script running..."
 
-# More thorough process cleanup - check for all related processes
-for proc in loupvagabond brave-browser chromium librewolf firedragon; do
-    if pgrep -f "$proc" > /dev/null; then
-        echo "Stopping processes related to $proc..."
-        pkill -f "$proc" || true
-        # Give processes time to exit gracefully
-        sleep 1
-        # Force kill any remaining processes
-        pkill -9 -f "$proc" 2>/dev/null || true
-    fi
-done
+# Stop only the launcher itself using exact process name.
+# Avoid -f matching, which can accidentally match apt/dpkg command lines.
+if pgrep -x loupvagabond > /dev/null; then
+    echo "Stopping running loupvagabond process..."
+    pkill -x loupvagabond || true
+    sleep 1
+    pkill -9 -x loupvagabond 2>/dev/null || true
+fi
 
 # Ensure any symlinks are removed in case they're causing issues
 if [ -L /usr/bin/loupvagabond ]; then
