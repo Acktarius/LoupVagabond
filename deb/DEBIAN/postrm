@@ -4,6 +4,12 @@ set +e
 
 echo "LoupVagabond post-removal script running..."
 
+# On upgrade, do not remove installed files from the new package.
+if [ "$1" = "upgrade" ] || [ "$1" = "failed-upgrade" ] || [ "$1" = "abort-install" ] || [ "$1" = "abort-upgrade" ]; then
+    echo "Post-removal called for upgrade/abort path ($1); skipping file cleanup."
+    exit 0
+fi
+
 # Restore original proxychains4.conf if backup exists
 if [ -f /etc/loupvagabond/proxychains4.conf.backup ]; then
     echo "Restoring original proxychains4.conf from backup..."
